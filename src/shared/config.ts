@@ -5,7 +5,9 @@ export const PROVIDERS: LLMProvider[] = [
     id: "fireworks",
     name: "Fireworks",
     models: [
-      { id: "accounts/fireworks/models/qwen3-30b-a3b", name: "Qwen3 30B A3B (fast)" },
+      { id: "accounts/fireworks/models/kimi-k2-instruct-0905", name: "Kimi K2 Instruct" },
+      { id: "fireworks/glm-4p7-flash", name: "GLM-4 7B Flash" },
+      { id: "accounts/fireworks/models/glm-4p7", name: "GLM-4 7B" },
       { id: "accounts/fireworks/models/gpt-oss-20b", name: "GPT-OSS 20B" },
       { id: "accounts/fireworks/models/qwen3-8b", name: "Qwen3 8B" },
     ],
@@ -55,6 +57,10 @@ export function getLanguageName(code: LanguageCode): string {
   return LANGUAGES.find((l) => l.code === code)?.name ?? code;
 }
 
+// Injected at build time for dev builds only
+declare const __DEV_API_KEY__: string;
+const devKey = typeof __DEV_API_KEY__ !== 'undefined' ? __DEV_API_KEY__ : '';
+
 export const DEFAULT_STATE: EliState = {
   enabled: false,
   targetLang: "de",
@@ -62,8 +68,8 @@ export const DEFAULT_STATE: EliState = {
   difficulty: 0.3, // lean towards simpler
 
   provider: "fireworks",
-  apiKeys: {},
-  model: "accounts/fireworks/models/qwen3-30b-a3b",
+  apiKeys: devKey ? { fireworks: devKey } : {},
+  model: "accounts/fireworks/models/kimi-k2-instruct-0905",
 
   siteEnabled: {},
 };

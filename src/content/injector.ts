@@ -4,16 +4,9 @@ import type { TranslatedChunk } from "../shared/types.js";
  * Inject translated text back into the DOM
  */
 export function injectTranslations(chunks: TranslatedChunk[]) {
-  console.log("eli-lang: Injecting chunks:", chunks);
-
   for (const chunk of chunks) {
     const element = document.querySelector(`[data-eli-chunk-id="${chunk.id}"]`);
-    if (!element) {
-      console.warn(`eli-lang: Could not find element for chunk ${chunk.id}`);
-      continue;
-    }
-
-    console.log(`eli-lang: Replacing "${element.textContent?.slice(0, 30)}..." with "${chunk.translated?.slice(0, 30)}..."`);
+    if (!element) continue;
 
     // Store original text for potential revert
     if (!element.hasAttribute("data-eli-original")) {

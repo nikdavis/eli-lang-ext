@@ -10,7 +10,14 @@ export async function getState(): Promise<EliState> {
 
   const result = await browser.storage.local.get(STORAGE_KEY);
   const stored = result[STORAGE_KEY] as Partial<EliState> | undefined;
-  cachedState = { ...DEFAULT_STATE, ...stored };
+
+  // Deep merge apiKeys and siteEnabled
+  cachedState = {
+    ...DEFAULT_STATE,
+    ...stored,
+    apiKeys: { ...DEFAULT_STATE.apiKeys, ...stored?.apiKeys },
+    siteEnabled: { ...DEFAULT_STATE.siteEnabled, ...stored?.siteEnabled },
+  };
   return cachedState;
 }
 

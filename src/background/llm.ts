@@ -2,6 +2,36 @@ import type { TextChunk, TranslatedChunk, EliState } from "../shared/types.js";
 import { buildTranslatePrompt, buildSelectionPrompt } from "../shared/prompts.js";
 import { getProvider } from "../shared/config.js";
 
+const MAX_RETRIES = 3;
+const TIMEOUT_MS = 30000;
+
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  retries = MAX_RETRIES
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+  try {
+    const response = await fetch(url, { ...options, signal: controller.signal });
+    clearTimeout(timeout);
+
+    if (!response.ok && retries > 0 && response.status >= 500) {
+      await new Promise(r => setTimeout(r, 1000 * (MAX_RETRIES - retries + 1)));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    return response;
+  } catch (e) {
+    clearTimeout(timeout);
+    if (retries > 0) {
+      await new Promise(r => setTimeout(r, 1000 * (MAX_RETRIES - retries + 1)));
+      return fetchWithRetry(url, options, retries - 1);
+    }
+    throw e;
+  }
+}
+
 export async function translateChunks(
   chunks: TextChunk[],
   targetLang: string,
@@ -44,7 +74,7 @@ export async function translateSingle(
 
   const prompt = buildSelectionPrompt(text, targetLang);
 
-  const response = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
+  const response = await fetchWithRetry("https://api.fireworks.ai/inference/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -59,8 +89,7 @@ export async function translateSingle(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API error: ${response.status} - ${errorText}`);
+    throw new Error(`API error: ${response.status}`);
   }
 
   const data = await response.json();
@@ -81,7 +110,7 @@ async function callFireworks(
 ): Promise<TranslatedChunk[]> {
   const prompt = buildTranslatePrompt(chunks, targetLang, difficulty);
 
-  const response = await fetch("https://api.fireworks.ai/inference/v1/chat/completions", {
+  const response = await fetchWithRetry("https://api.fireworks.ai/inference/v1/chat/completions", {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -98,8 +127,7 @@ async function callFireworks(
   });
 
   if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Fireworks API error: ${response.status} - ${errorText}`);
+    throw new Error(`Fireworks API error: ${response.status}`);
   }
 
   const data = await response.json();
@@ -130,7 +158,6 @@ async function callFireworks(
     const parsed = JSON.parse(jsonStr);
     return parsed.chunks as TranslatedChunk[];
   } catch (e) {
-    console.error("Failed to parse LLM response:", content);
-    throw new Error(`Failed to parse translation response: ${e}`);
+    throw new Error(`Failed to parse translation response`);
   }
 }

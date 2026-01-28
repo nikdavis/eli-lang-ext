@@ -4,11 +4,14 @@
   "description": "Language learning browser extension - ELI5 any website in your target language",
   "type": "module",
   "scripts": {
-    "dev": "node build.js --watch",
+    "dev": "node build.js --dev && web-ext run --source-dir=dist --target=firefox-desktop --no-reload",
+    "dev:chrome": "node build.js --dev --chrome && web-ext run --source-dir=dist --target=chromium --no-reload",
     "build": "node build.js",
+    "build:chrome": "node build.js --chrome",
     "clean": "rm -rf dist",
-    "web-ext": "web-ext run --source-dir=dist --target=firefox-desktop",
-    "web-ext:zen": "web-ext run --source-dir=dist --firefox=/usr/bin/zen-browser"
+    "web-ext": "npm run build && web-ext run --source-dir=dist --target=firefox-desktop",
+    "web-ext:chrome": "npm run build:chrome && web-ext run --source-dir=dist --target=chromium",
+    "web-ext:zen": "npm run build && web-ext run --source-dir=dist --firefox=/usr/bin/zen-browser"
   },
   "devDependencies": {
     "@types/webextension-polyfill": "^0.12.4",

@@ -26,7 +26,6 @@ async function handleMessage(message: Message, _sender: Runtime.MessageSender): 
       return handleSelectionTranslate((message as any).text, (message as any).targetLang);
 
     default:
-      console.warn("Unknown message type:", message);
       return null;
   }
 }
@@ -46,7 +45,6 @@ async function handleTranslate(
     const translated = await translateChunks(chunks, targetLang, difficulty, state);
     return { type: "TRANSLATE_RESULT", chunks: translated };
   } catch (error) {
-    console.error("Translation error:", error);
     return { error: String(error) };
   }
 }
@@ -58,9 +56,8 @@ async function handleSelectionTranslate(text: string, targetLang: string) {
     const translation = await translateSingle(text, targetLang, state);
     return { translation };
   } catch (error) {
-    console.error("Selection translation error:", error);
     return { error: String(error) };
   }
 }
 
-console.log("eli-lang background script loaded");
+// Background script ready

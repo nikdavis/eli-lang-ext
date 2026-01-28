@@ -1,7 +1,7 @@
 import type { TextChunk } from "../shared/types.js";
 
-// Elements that contain translatable content (block-level text containers)
-const CONTENT_TAGS = new Set(["P", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "TD", "TH", "BLOCKQUOTE", "FIGCAPTION"]);
+// Elements that contain translatable content
+const CONTENT_TAGS = new Set(["P", "H1", "H2", "H3", "H4", "H5", "H6", "LI", "TD", "TH", "BLOCKQUOTE", "FIGCAPTION", "LABEL", "A", "BUTTON", "SPAN"]);
 
 // Elements to skip entirely
 const SKIP_TAGS = new Set([
@@ -20,11 +20,11 @@ const SKIP_SELECTORS = [
   ".reference", ".reflist", // Skip references
 ].join(",");
 
-// Minimum text length
-const MIN_TEXT_LENGTH = 40;
+// Minimum text length (0 = no minimum)
+const MIN_TEXT_LENGTH = 0;
 
-// Maximum chunks per batch
-const MAX_CHUNKS_PER_BATCH = 15;
+// Maximum chunks to extract (0 = unlimited)
+const MAX_CHUNKS = 200;
 
 let chunkIdCounter = 0;
 
@@ -70,7 +70,7 @@ export function extractChunks(root: Element = document.body): TextChunk[] {
   );
 
   for (const el of elements) {
-    if (chunks.length >= MAX_CHUNKS_PER_BATCH) break;
+    if (MAX_CHUNKS > 0 && chunks.length >= MAX_CHUNKS) break;
 
     if (shouldSkip(el)) continue;
     if (el.closest("[data-eli-chunk-id]")) continue; // Already processed
@@ -88,7 +88,6 @@ export function extractChunks(root: Element = document.body): TextChunk[] {
     chunks.push({ id, text });
   }
 
-  console.log(`eli-lang: Extracted ${chunks.length} content blocks`);
   return chunks;
 }
 
@@ -107,5 +106,5 @@ export function extractFromNodes(nodes: Node[]): TextChunk[] {
     }
   }
 
-  return chunks.slice(0, MAX_CHUNKS_PER_BATCH);
+  return chunks;
 }

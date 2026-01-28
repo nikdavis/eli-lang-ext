@@ -4,26 +4,25 @@ import { extractChunks } from "./extractor.js";
 import { injectTranslations, revertTranslations } from "./injector.js";
 import { startObserver, stopObserver } from "./observer.js";
 import { initSelection, updateSelectionState } from "./selection.js";
+import { showProgress, updateProgress, hideProgress } from "./progress.js";
 
 let state: EliState = DEFAULT_STATE;
 let isTranslating = false;
 
-// Get current domain
+const BATCH_SIZE = 10;
+const MAX_CONCURRENT = 3;
+
 function getDomain(): string {
   return window.location.hostname;
 }
 
-// Check if translation is enabled for current site
 function isEnabledForSite(): boolean {
   if (!state.enabled) return false;
   const domain = getDomain();
-  // If site is explicitly disabled, don't translate
   if (state.siteEnabled[domain] === false) return false;
-  // If site is explicitly enabled OR no preference, translate
   return state.siteEnabled[domain] === true || Object.keys(state.siteEnabled).length === 0 || state.siteEnabled[domain] === undefined;
 }
 
-// Initialize: get state and set up
 async function init() {
   try {
     const response = await browser.runtime.sendMessage({ type: "GET_STATE" });
@@ -31,19 +30,22 @@ async function init() {
       state = response as EliState;
     }
   } catch (e) {
-    console.warn("eli-lang: Could not get initial state", e);
+    console.log("[eli-lang] Failed to get state:", e);
   }
 
-  // Always init selection popup (works even when translation is off)
+  console.log("[eli-lang] State:", { enabled: state.enabled, provider: state.provider, hasKey: !!state.apiKeys[state.provider] });
+
   initSelection(state);
 
   if (isEnabledForSite()) {
+    console.log("[eli-lang] Starting translation...");
     await translatePage();
     startObserver();
+  } else {
+    console.log("[eli-lang] Not enabled for this site");
   }
 }
 
-// Listen for state updates from background
 browser.runtime.onMessage.addListener((message: unknown) => {
   const msg = message as Message;
   if (msg.type === "STATE_UPDATE") {
@@ -53,66 +55,96 @@ browser.runtime.onMessage.addListener((message: unknown) => {
     const nowEnabled = isEnabledForSite();
 
     if (!wasEnabled && nowEnabled) {
-      // Just enabled - translate page
       translatePage();
       startObserver();
     } else if (wasEnabled && !nowEnabled) {
-      // Just disabled - revert
       stopObserver();
       revertTranslations();
     }
   }
 });
 
-// Translate the current page
 async function translatePage() {
   if (isTranslating) return;
   isTranslating = true;
 
-  console.log("eli-lang: Starting page translation");
-
   try {
     const chunks = extractChunks();
-    if (chunks.length === 0) {
-      console.log("eli-lang: No text chunks found");
-      return;
-    }
+    console.log(`[eli-lang] Extracted ${chunks.length} chunks`);
+    if (chunks.length === 0) return;
 
-    console.log(`eli-lang: Found ${chunks.length} chunks to translate`);
-    await translateAndInject(chunks);
+    await translateInBatches(chunks);
   } catch (e) {
-    console.error("eli-lang: Translation error", e);
+    console.log("[eli-lang] Translation error:", e);
   } finally {
     isTranslating = false;
   }
 }
 
-// Send chunks to background for translation and inject results
-export async function translateAndInject(chunks: TextChunk[]) {
-  if (chunks.length === 0) return;
+async function translateInBatches(chunks: TextChunk[]) {
+  const total = chunks.length;
+  let completed = 0;
 
-  try {
-    const response = await browser.runtime.sendMessage({
-      type: "TRANSLATE_CHUNKS",
-      chunks,
-      targetLang: state.targetLang,
-      difficulty: state.difficulty,
-    }) as { error?: string; chunks?: { id: string; translated: string }[] } | undefined;
+  showProgress(total);
 
-    if (response?.error) {
-      console.error("eli-lang: Translation failed", response.error);
-      return;
-    }
-
-    if (response?.chunks) {
-      injectTranslations(response.chunks);
-      console.log(`eli-lang: Injected ${response.chunks.length} translations`);
-    }
-  } catch (e) {
-    console.error("eli-lang: Failed to send translation request", e);
+  // Split into batches
+  const batches: TextChunk[][] = [];
+  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
+    batches.push(chunks.slice(i, i + BATCH_SIZE));
   }
+
+  // Process batches with concurrency limit
+  const pending: Promise<void>[] = [];
+  let batchIndex = 0;
+
+  const processBatch = async (batch: TextChunk[], batchNum: number) => {
+    console.log(`[eli-lang] Sending batch ${batchNum} (${batch.length} chunks)`);
+    try {
+      const response = await browser.runtime.sendMessage({
+        type: "TRANSLATE_CHUNKS",
+        chunks: batch,
+        targetLang: state.targetLang,
+        difficulty: state.difficulty,
+      }) as { error?: string; chunks?: { id: string; translated: string }[] } | undefined;
+
+      if (response?.error) {
+        console.log(`[eli-lang] Batch ${batchNum} error:`, response.error);
+      } else if (response?.chunks) {
+        console.log(`[eli-lang] Batch ${batchNum} complete, got ${response.chunks.length} translations`);
+        injectTranslations(response.chunks);
+      }
+    } catch (e) {
+      console.log(`[eli-lang] Batch ${batchNum} failed:`, e);
+    }
+    completed += batch.length;
+    updateProgress(completed, total);
+  };
+
+  while (batchIndex < batches.length || pending.length > 0) {
+    // Start new batches up to concurrency limit
+    while (pending.length < MAX_CONCURRENT && batchIndex < batches.length) {
+      const batch = batches[batchIndex];
+      const batchNum = batchIndex + 1;
+      batchIndex++;
+      const p = processBatch(batch, batchNum).then(() => {
+        pending.splice(pending.indexOf(p), 1);
+      });
+      pending.push(p);
+    }
+
+    // Wait for at least one to complete
+    if (pending.length > 0) {
+      await Promise.race(pending);
+    }
+  }
+
+  hideProgress();
 }
 
-// Start
+export async function translateAndInject(chunks: TextChunk[]) {
+  if (chunks.length === 0) return;
+  await translateInBatches(chunks);
+}
+
 init();
-console.log("eli-lang: Content script loaded");
+console.log("[eli-lang] Content script loaded");

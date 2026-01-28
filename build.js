@@ -1,17 +1,37 @@
 import * as esbuild from 'esbuild';
-import { cpSync, mkdirSync, existsSync } from 'fs';
-import { dirname } from 'path';
+import { cpSync, mkdirSync, existsSync, readFileSync, writeFileSync } from 'fs';
 
 const isWatch = process.argv.includes('--watch');
+const isDev = process.argv.includes('--dev') || isWatch;
+const targetBrowser = process.argv.includes('--chrome') ? 'chrome' : 'firefox';
+
+// Only load .env API key for dev builds
+let devApiKey = '';
+if (isDev && existsSync('.env')) {
+  devApiKey = readFileSync('.env', 'utf-8').trim();
+}
 
 // Ensure dist exists
 if (!existsSync('dist')) {
   mkdirSync('dist', { recursive: true });
 }
 
-// Copy static files
+// Copy static files and generate browser-specific manifest
 function copyStatic() {
-  cpSync('src/manifest.json', 'dist/manifest.json');
+  const manifest = JSON.parse(readFileSync('src/manifest.json', 'utf-8'));
+
+  if (targetBrowser === 'chrome') {
+    // Chrome MV3 uses service_worker
+    manifest.background = {
+      service_worker: 'background.js',
+      type: 'module'
+    };
+    // Remove Firefox-specific settings
+    delete manifest.browser_specific_settings;
+  }
+  // Firefox uses scripts array (already in manifest)
+
+  writeFileSync('dist/manifest.json', JSON.stringify(manifest, null, 2));
   cpSync('src/popup/popup.html', 'dist/popup/popup.html', { recursive: true });
   cpSync('src/options/options.html', 'dist/options/options.html', { recursive: true });
   if (existsSync('src/assets')) {
@@ -26,9 +46,12 @@ function copyStatic() {
 
 const buildOptions = {
   bundle: true,
-  target: 'firefox115',
+  target: targetBrowser === 'chrome' ? 'chrome120' : 'firefox115',
   sourcemap: true,
   minify: !isWatch,
+  define: {
+    '__DEV_API_KEY__': JSON.stringify(devApiKey),
+  },
 };
 
 async function build() {
@@ -69,6 +92,9 @@ async function build() {
 }
 
 if (isWatch) {
+  // Copy static files once at start
+  copyStatic();
+
   const ctx = await esbuild.context({
     ...buildOptions,
     entryPoints: [
@@ -82,9 +108,6 @@ if (isWatch) {
 
   await ctx.watch();
   console.log('Watching for changes...');
-
-  // Also copy static on change (simple polling for now)
-  setInterval(copyStatic, 1000);
 } else {
   await build();
 }

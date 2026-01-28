@@ -6,10 +6,27 @@ Choose your target language and comprehension level (ELI5, ELI10, etc.) to get t
 
 ## Setup
 
-1. `npm install`
-2. `npm run build`
-3. Load `dist/` as an unpacked extension
-4. Add your API key in extension options (supports Fireworks, OpenAI, Google)
+```bash
+npm install
+npm run build
+```
+
+## Development
+
+Run with hot-reload in a temporary browser profile:
+
+```bash
+npm run web-ext         # Firefox
+npm run web-ext:chrome  # Chrome/Chromium
+```
+
+Requires Firefox or Chrome/Chromium installed on your system.
+
+## Manual Install
+
+1. Build with `npm run build`
+2. Load `dist/` as an unpacked extension in your browser
+3. Add your API key in extension options (supports Fireworks, OpenAI, Google)
 
 ## Usage
 

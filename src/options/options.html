@@ -211,9 +211,13 @@
 
       <div class="section">
         <label for="model">Model</label>
-        <select id="model">
-          <option value="accounts/fireworks/models/qwen3-8b">Qwen3 8B</option>
-        </select>
+        <div class="api-key-input">
+          <select id="model" style="flex: 1;">
+            <option value="accounts/fireworks/models/qwen3-8b">Qwen3 8B</option>
+          </select>
+          <button class="btn btn-secondary" id="test-model">Test</button>
+        </div>
+        <div id="test-status"></div>
       </div>
     </div>
 

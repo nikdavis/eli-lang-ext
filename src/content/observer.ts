@@ -29,8 +29,6 @@ export function startObserver() {
     childList: true,
     subtree: true,
   });
-
-  console.log("eli-lang: Observer started");
 }
 
 /**
@@ -46,7 +44,6 @@ export function stopObserver() {
     debounceTimer = null;
   }
   pending.clear();
-  console.log("eli-lang: Observer stopped");
 }
 
 function scheduleFlush() {
@@ -63,6 +60,5 @@ async function flush() {
   const chunks = extractFromNodes(nodes);
   if (chunks.length === 0) return;
 
-  console.log(`eli-lang: Translating ${chunks.length} new chunks`);
   await translateAndInject(chunks);
 }
