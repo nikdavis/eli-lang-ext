@@ -1,0 +1,22 @@
+{
+  "name": "eli-lang",
+  "version": "0.1.0",
+  "description": "Language learning browser extension - ELI5 any website in your target language",
+  "type": "module",
+  "scripts": {
+    "dev": "node build.js --watch",
+    "build": "node build.js",
+    "clean": "rm -rf dist",
+    "web-ext": "web-ext run --source-dir=dist --target=firefox-desktop",
+    "web-ext:zen": "web-ext run --source-dir=dist --firefox=/usr/bin/zen-browser"
+  },
+  "devDependencies": {
+    "@types/webextension-polyfill": "^0.12.4",
+    "esbuild": "^0.24.0",
+    "typescript": "^5.7.0",
+    "web-ext": "^8.3.0"
+  },
+  "dependencies": {
+    "webextension-polyfill": "^0.12.0"
+  }
+}
